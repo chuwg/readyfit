@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { loadUserProfile } from '../src/services/db';
+import { registerMorningRefresh } from '../src/services/background';
 import { colors } from '../src/theme/colors';
 
 export default function RootLayout() {
@@ -24,6 +25,10 @@ export default function RootLayout() {
       setChecked(true);
     })();
   }, [router, segments]);
+
+  useEffect(() => {
+    registerMorningRefresh();
+  }, []);
 
   useEffect(() => {
     const handleResponse = (response: Notifications.NotificationResponse) => {

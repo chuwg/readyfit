@@ -9,31 +9,54 @@ import type {
   WorkoutRecord,
 } from '../types';
 
+/** Linear interpolation from x in [x0,x1] onto [y0,y1], clamped to the ends. */
+function lerpClamp(x: number, x0: number, x1: number, y0: number, y1: number): number {
+  if (x1 === x0) return y0;
+  const t = Math.max(0, Math.min(1, (x - x0) / (x1 - x0)));
+  return y0 + t * (y1 - y0);
+}
+
 function sleepScore(snap: HealthSnapshot): number {
   const hours = snap.sleepMinutes / 60;
-  let base: number;
-  if (hours >= 7) base = 30;
-  else if (hours >= 6) base = 22;
-  else if (hours >= 5) base = 14;
-  else base = 6;
-  const bonus = snap.deepSleepRatio >= 0.2 ? 5 : 0;
-  return Math.min(30, base + bonus);
+  // Continuous: 4h → 6pts, 7h → 25pts (duration component caps at 25).
+  const duration = lerpClamp(hours, 4, 7, 6, 25);
+  // Stage quality bonus (0–5): reward healthy deep + REM proportions.
+  const deepBonus = lerpClamp(snap.deepSleepRatio, 0.1, 0.2, 0, 3);
+  const remBonus = lerpClamp(snap.remSleepRatio, 0.1, 0.22, 0, 2);
+  return Math.max(0, Math.min(30, duration + deepBonus + remBonus));
 }
 
 function hrvScore(snap: HealthSnapshot): number {
   if (snap.hrvAverageMs <= 0) return 18;
   const ratio = snap.hrvMs / snap.hrvAverageMs;
-  if (ratio >= 1.1) return 25;
-  if (ratio <= 0.9) return 10;
-  return 18;
+  // Continuous: ratio 0.85 → 8pts, 1.15 → 25pts.
+  return Math.round(lerpClamp(ratio, 0.85, 1.15, 8, 25));
 }
 
 function recoveryScore(snap: HealthSnapshot): number {
   if (snap.restingHrAverageBpm <= 0) return 18;
   const diff = snap.restingHrBpm - snap.restingHrAverageBpm;
-  if (diff <= -2) return 25;
-  if (diff >= 3) return 10;
-  return 18;
+  // Continuous: +4bpm above baseline → 8pts, −3bpm below → 25pts.
+  return Math.round(lerpClamp(diff, 4, -3, 8, 25));
+}
+
+/**
+ * Autonomic stress signal from overnight respiratory rate and blood oxygen.
+ * Returns a small non-positive adjustment (0 to −10) applied to the total —
+ * elevated breathing rate or low SpO2 indicate impaired recovery.
+ */
+function autonomicAdjust(snap: HealthSnapshot): number {
+  let adjust = 0;
+  if (snap.respiratoryRateAverageBrpm > 0 && snap.respiratoryRateBrpm > 0) {
+    const diff = snap.respiratoryRateBrpm - snap.respiratoryRateAverageBrpm;
+    // +1 brpm over baseline starts costing points, capped at −6.
+    adjust -= lerpClamp(diff, 1, 3, 0, 6);
+  }
+  if (snap.oxygenSaturationPct > 0) {
+    // Below 95% SpO2 begins penalizing, −6 at 92% and lower.
+    adjust -= lerpClamp(snap.oxygenSaturationPct, 95, 92, 0, 6);
+  }
+  return -Math.min(10, -adjust);
 }
 
 function yesterdayKey(): string {
@@ -97,14 +120,15 @@ export function computeReadiness(
   shiftDay?: ShiftDay | null,
 ): Readiness {
   const breakdown: ReadinessBreakdown = {
-    sleep: sleepScore(snap),
+    sleep: Math.round(sleepScore(snap)),
     hrv: hrvScore(snap),
     recovery: recoveryScore(snap),
     load: loadScore(snap),
   };
   const base = breakdown.sleep + breakdown.hrv + breakdown.recovery + breakdown.load;
   const modifier = shiftDay ? shiftModifier(shiftDay) : 0;
-  const total = Math.max(0, Math.min(100, base + modifier));
+  const autonomic = autonomicAdjust(snap);
+  const total = Math.max(0, Math.min(100, Math.round(base + modifier + autonomic)));
   const { status, label, emoji, advice } = statusFromTotal(total);
   return { total, breakdown, status, label, emoji, advice };
 }

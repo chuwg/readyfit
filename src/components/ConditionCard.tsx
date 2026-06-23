@@ -39,6 +39,22 @@ export function ConditionCard({ snap }: { snap: HealthSnapshot }) {
         ratio={fatigueRatio}
         color={colors.recovery}
       />
+      {snap.respiratoryRateBrpm > 0 && (
+        <ProgressBar
+          label="호흡수"
+          value={`${snap.respiratoryRateBrpm.toFixed(1)}회/분`}
+          ratio={Math.min(1, Math.max(0, 1 - (snap.respiratoryRateBrpm - 12) / 8))}
+          color={colors.hrv}
+        />
+      )}
+      {snap.oxygenSaturationPct > 0 && (
+        <ProgressBar
+          label="혈중 산소"
+          value={`${snap.oxygenSaturationPct.toFixed(0)}%`}
+          ratio={Math.min(1, Math.max(0, (snap.oxygenSaturationPct - 90) / 8))}
+          color={colors.sleep}
+        />
+      )}
     </Card>
   );
 }

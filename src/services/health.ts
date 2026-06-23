@@ -36,10 +36,17 @@ function mockSnapshot(): HealthSnapshot {
   return {
     sleepMinutes: 6 * 60 + 42,
     deepSleepRatio: 0.18,
+    remSleepRatio: 0.22,
+    lightSleepRatio: 0.6,
+    awakeMinutes: 18,
     hrvMs: 48,
     hrvAverageMs: 46,
     restingHrBpm: 58,
     restingHrAverageBpm: 60,
+    respiratoryRateBrpm: 14.2,
+    respiratoryRateAverageBrpm: 14.0,
+    oxygenSaturationPct: 97,
+    oxygenSaturationAveragePct: 97,
     recentWorkouts: [
       mk(1, 35, 280, '러닝'),
       mk(3, 60, 520, '농구'),
@@ -63,6 +70,8 @@ async function loadHealthKit(): Promise<HealthSnapshot | null> {
       'HKCategoryTypeIdentifierSleepAnalysis',
       'HKQuantityTypeIdentifierHeartRateVariabilitySDNN',
       'HKQuantityTypeIdentifierRestingHeartRate',
+      'HKQuantityTypeIdentifierRespiratoryRate',
+      'HKQuantityTypeIdentifierOxygenSaturation',
       'HKQuantityTypeIdentifierActiveEnergyBurned',
       'HKWorkoutTypeIdentifier',
     ];
@@ -73,8 +82,13 @@ async function loadHealthKit(): Promise<HealthSnapshot | null> {
     const nightStart = addDays(startOfDay(now), -1);
     nightStart.setHours(20, 0, 0, 0);
 
+    // HKCategoryValueSleepAnalysis: 0=inBed, 1=asleepUnspecified, 2=awake,
+    // 3=asleepCore(light), 4=asleepDeep, 5=asleepREM
     let sleepMinutes = 0;
     let deepMinutes = 0;
+    let remMinutes = 0;
+    let lightMinutes = 0;
+    let awakeMinutes = 0;
     try {
       const samples: any[] = (await HealthKit.queryCategorySamples?.(
         'HKCategoryTypeIdentifierSleepAnalysis',
@@ -83,8 +97,15 @@ async function loadHealthKit(): Promise<HealthSnapshot | null> {
       for (const s of samples) {
         const durMin = (new Date(s.endDate).getTime() - new Date(s.startDate).getTime()) / 60000;
         const v = s.value;
-        if (v === 3 || v === 4 || v === 5) sleepMinutes += durMin;
+        if (v === 2) {
+          awakeMinutes += durMin;
+          continue;
+        }
+        // Count anything that isn't "awake"/"inBed" as asleep time.
+        if (v === 1 || v === 3 || v === 4 || v === 5) sleepMinutes += durMin;
         if (v === 4) deepMinutes += durMin;
+        else if (v === 5) remMinutes += durMin;
+        else if (v === 3 || v === 1) lightMinutes += durMin;
       }
     } catch {}
 
@@ -122,6 +143,46 @@ async function loadHealthKit(): Promise<HealthSnapshot | null> {
       }
     } catch {}
 
+    let respiratoryRateBrpm = 0;
+    let respiratoryRateAverageBrpm = 0;
+    try {
+      // Overnight respiratory rate: prefer samples within the sleep window for
+      // the "latest" value, fall back to most recent sample.
+      const respSamples: any[] = (await HealthKit.queryQuantitySamples?.(
+        'HKQuantityTypeIdentifierRespiratoryRate',
+        { from: addDays(now, -30), to: now, unit: 'count/min' },
+      )) ?? [];
+      if (respSamples.length > 0) {
+        const nightSamples = respSamples.filter(
+          (x) => new Date(x.endDate).getTime() >= nightStart.getTime(),
+        );
+        const latestPool = nightSamples.length > 0 ? nightSamples : respSamples;
+        const avgOf = (arr: any[]) =>
+          arr.reduce((acc, x) => acc + (x.quantity ?? 0), 0) / arr.length;
+        respiratoryRateBrpm = avgOf(latestPool);
+        respiratoryRateAverageBrpm = avgOf(respSamples);
+      }
+    } catch {}
+
+    let oxygenSaturationPct = 0;
+    let oxygenSaturationAveragePct = 0;
+    try {
+      const o2Samples: any[] = (await HealthKit.queryQuantitySamples?.(
+        'HKQuantityTypeIdentifierOxygenSaturation',
+        { from: addDays(now, -30), to: now, unit: '%' },
+      )) ?? [];
+      if (o2Samples.length > 0) {
+        // HealthKit stores SpO2 as a 0–1 fraction; normalize to percent.
+        const toPct = (q: number) => (q <= 1 ? q * 100 : q);
+        const sorted = [...o2Samples].sort(
+          (a, b) => new Date(b.endDate).getTime() - new Date(a.endDate).getTime(),
+        );
+        oxygenSaturationPct = toPct(sorted[0]?.quantity ?? 0);
+        const sum = o2Samples.reduce((acc, x) => acc + toPct(x.quantity ?? 0), 0);
+        oxygenSaturationAveragePct = sum / o2Samples.length;
+      }
+    } catch {}
+
     let recentWorkouts: WorkoutRecord[] = [];
     try {
       const workouts: any[] = (await HealthKit.queryWorkouts?.({
@@ -148,10 +209,17 @@ async function loadHealthKit(): Promise<HealthSnapshot | null> {
     return {
       sleepMinutes,
       deepSleepRatio: sleepMinutes > 0 ? deepMinutes / sleepMinutes : 0,
+      remSleepRatio: sleepMinutes > 0 ? remMinutes / sleepMinutes : 0,
+      lightSleepRatio: sleepMinutes > 0 ? lightMinutes / sleepMinutes : 0,
+      awakeMinutes,
       hrvMs,
       hrvAverageMs: hrvAverageMs || hrvMs,
       restingHrBpm,
       restingHrAverageBpm: restingHrAverageBpm || restingHrBpm,
+      respiratoryRateBrpm,
+      respiratoryRateAverageBrpm: respiratoryRateAverageBrpm || respiratoryRateBrpm,
+      oxygenSaturationPct,
+      oxygenSaturationAveragePct: oxygenSaturationAveragePct || oxygenSaturationPct,
       recentWorkouts,
       isMock: false,
     };

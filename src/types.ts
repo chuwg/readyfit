@@ -11,10 +11,19 @@ export interface WorkoutRecord {
 export interface HealthSnapshot {
   sleepMinutes: number;
   deepSleepRatio: number;
+  remSleepRatio: number;
+  lightSleepRatio: number;
+  awakeMinutes: number;
   hrvMs: number;
   hrvAverageMs: number;
   restingHrBpm: number;
   restingHrAverageBpm: number;
+  /** Overnight respiratory rate (breaths/min), latest night. 0 = unavailable. */
+  respiratoryRateBrpm: number;
+  respiratoryRateAverageBrpm: number;
+  /** Blood oxygen saturation (%), latest. 0 = unavailable. */
+  oxygenSaturationPct: number;
+  oxygenSaturationAveragePct: number;
   recentWorkouts: WorkoutRecord[];
   isMock: boolean;
 }

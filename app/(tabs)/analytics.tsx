@@ -221,8 +221,11 @@ function WeekView({ data }: { data: Data }) {
     [data.weekBasketball, data.weekRunning, weekStart, weightKg],
   );
   const load: LoadIndex = useMemo(
-    () => computeLoadIndex(now, data.allRunning, data.allBasketball, weightKg),
-    [data.allBasketball, data.allRunning, now, weightKg],
+    () =>
+      computeLoadIndex(now, data.allRunning, data.allBasketball, {
+        maxHr: data.profile.maxHeartRate,
+      }),
+    [data.allBasketball, data.allRunning, now, data.profile.maxHeartRate],
   );
   const totalKm = days.reduce((a, d) => a + d.runningKm, 0);
   const totalMin = days.reduce(
@@ -244,23 +247,23 @@ function WeekView({ data }: { data: Data }) {
 
       <Card title="훈련 부하 (ATL/CTL)">
         <View style={styles.summaryRow}>
-          <SummaryCell label="ATL (7일)" value={`${load.atl} kcal`} />
-          <SummaryCell label="CTL (28일)" value={`${load.ctl} kcal`} />
+          <SummaryCell label="ATL (7일)" value={`${load.atl}`} />
+          <SummaryCell label="CTL (28일)" value={`${load.ctl}`} />
           <SummaryCell
-            label="균형"
-            value={`${load.balance > 0 ? '+' : ''}${load.balance}`}
+            label="ACWR"
+            value={load.acwr.toFixed(2)}
             color={load.warning ? colors.bad : colors.mint}
           />
         </View>
         {load.warning && (
           <View style={styles.warnBox}>
             <Text style={styles.warnText}>
-              이번 주 훈련 강도가 높아요. 회복일을 추가해보세요.
+              급성 부하가 만성 대비 높아요 (ACWR ≥ 1.3). 회복일을 추가해보세요.
             </Text>
           </View>
         )}
         <Text style={styles.hint}>
-          ATL은 최근 7일, CTL은 최근 28일 일평균 칼로리입니다. 균형 +20 이상이면 과부하 신호.
+          심박 기반 훈련부하(TRIMP)의 7일·28일 일평균입니다. ACWR(급성/만성)이 0.8~1.3이면 적정, 1.3 이상이면 과부하 신호.
         </Text>
       </Card>
     </>

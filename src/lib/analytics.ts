@@ -101,14 +101,59 @@ export interface LoadIndex {
   atl: number;
   ctl: number;
   balance: number;
+  /** Acute:chronic workload ratio (ATL/CTL). ~0.8–1.3 is the "sweet spot". */
+  acwr: number;
   warning: boolean;
+}
+
+export interface LoadOptions {
+  /** Max heart rate (bpm). Falls back to 190 when unknown. */
+  maxHr?: number | null;
+  /** Resting heart rate (bpm). Falls back to 60 when unknown. */
+  restingHr?: number | null;
+}
+
+const DEFAULT_MAX_HR = 190;
+const DEFAULT_RESTING_HR = 60;
+
+/** Banister TRIMP for one session (male coefficient). HR-aware load unit. */
+function trimp(minutes: number, hrReserveRatio: number): number {
+  if (minutes <= 0) return 0;
+  return minutes * hrReserveRatio * 0.64 * Math.exp(1.92 * hrReserveRatio);
+}
+
+function hrReserveRatio(
+  avgHr: number | null,
+  maxHr: number,
+  restingHr: number,
+): number {
+  // No HR data → assume a moderate session (60% of reserve).
+  if (!avgHr || maxHr <= restingHr) return 0.6;
+  const r = (avgHr - restingHr) / (maxHr - restingHr);
+  return Math.max(0.3, Math.min(1, r));
+}
+
+/**
+ * HR-based training load for a session (TRIMP units). Uses heart rate when
+ * available; otherwise estimates from a moderate-intensity assumption so the
+ * unit stays consistent across sessions with and without HR.
+ */
+export function sessionLoad(
+  durationS: number,
+  avgHr: number | null,
+  opts: LoadOptions = {},
+): number {
+  const maxHr = opts.maxHr && opts.maxHr > 0 ? opts.maxHr : DEFAULT_MAX_HR;
+  const restingHr =
+    opts.restingHr && opts.restingHr > 0 ? opts.restingHr : DEFAULT_RESTING_HR;
+  return trimp(durationS / 60, hrReserveRatio(avgHr, maxHr, restingHr));
 }
 
 export function computeLoadIndex(
   now: Date,
   running: RunningSession[],
   basketball: BasketballSession[],
-  weightKg: number | null = null,
+  opts: LoadOptions = {},
 ): LoadIndex {
   const today = startOfDay(now).getTime();
   const day = 86_400_000;
@@ -116,15 +161,17 @@ export function computeLoadIndex(
     const cutoff = today - day * days;
     let total = 0;
     for (const r of running)
-      if (r.startedAt >= cutoff) total += runningCalories(r, weightKg);
+      if (r.startedAt >= cutoff) total += sessionLoad(r.durationS, r.avgHr, opts);
     for (const b of basketball)
-      if (b.startedAt >= cutoff) total += basketballCalories(b, weightKg);
+      if (b.startedAt >= cutoff) total += sessionLoad(b.durationS, b.avgHr, opts);
     return total;
   };
   const atl = Math.round(sumIn(7) / 7);
   const ctl = Math.round(sumIn(28) / 28);
   const balance = atl - ctl;
-  return { atl, ctl, balance, warning: balance >= 20 };
+  // Relative acute:chronic ratio — scale-independent, unlike a fixed kcal gap.
+  const acwr = ctl > 0 ? atl / ctl : atl > 0 ? 2 : 0;
+  return { atl, ctl, balance, acwr, warning: acwr >= 1.3 };
 }
 
 export interface MonthSummary {
