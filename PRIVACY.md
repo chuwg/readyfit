@@ -66,7 +66,7 @@
 본 정책 또는 본 앱의 개인정보 처리에 관한 문의는 다음 연락처로 가능합니다:
 
 - **이메일**: gi828282@naver.com
-- **GitHub**: https://github.com/chuwg/fitlog
+- **GitHub**: https://github.com/chuwg/readyfit
 
 ---
 
