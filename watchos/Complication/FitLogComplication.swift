@@ -174,7 +174,7 @@ struct FitLogComplication: Widget {
     StaticConfiguration(kind: kind, provider: ReadinessProvider()) { entry in
       FitLogComplicationEntryView(entry: entry)
     }
-    .configurationDisplayName("핏로그")
+    .configurationDisplayName("레디핏")
     .description("훈련 준비 점수")
     .supportedFamilies([
       .accessoryCircular,

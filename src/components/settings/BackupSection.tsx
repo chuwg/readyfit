@@ -59,7 +59,7 @@ export function BackupSection({ onAfterImport }: Props) {
               if (e?.message === 'CANCELED') {
                 // user canceled — ignore
               } else if (e?.message === 'INVALID_FORMAT') {
-                Alert.alert('형식 오류', '핏로그 백업 파일이 아닙니다.');
+                Alert.alert('형식 오류', '레디핏 백업 파일이 아닙니다.');
               } else if (e?.message === 'VERSION_TOO_NEW') {
                 Alert.alert(
                   '버전 호환 안 됨',

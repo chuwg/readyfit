@@ -87,7 +87,7 @@ export async function startLiveTracking(): Promise<StartTrackingResult> {
       showsBackgroundLocationIndicator: true,
       foregroundService: background
         ? {
-            notificationTitle: '핏로그 러닝 중',
+            notificationTitle: '레디핏 러닝 중',
             notificationBody: 'GPS로 거리와 페이스를 측정하고 있어요',
           }
         : undefined,

@@ -80,7 +80,7 @@ export async function exportToFile(): Promise<ExportResult> {
   if (canShare) {
     await Sharing.shareAsync(fileUri, {
       mimeType: 'application/json',
-      dialogTitle: '핏로그 백업 파일 공유',
+      dialogTitle: '레디핏 백업 파일 공유',
       UTI: 'public.json',
     });
     return { shared: true, fileUri, size: json.length };

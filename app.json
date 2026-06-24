@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "핏로그 - 교대근무 트레이너",
+    "name": "레디핏 - 교대근무 트레이너",
     "slug": "fitlog",
     "version": "1.1.0",
     "orientation": "portrait",
@@ -28,7 +28,7 @@
       "bundleIdentifier": "com.chuwg.fitlog",
       "buildNumber": "2",
       "infoPlist": {
-        "CFBundleDisplayName": "핏로그",
+        "CFBundleDisplayName": "레디핏",
         "NSHealthShareUsageDescription": "훈련 준비 상태를 분석하기 위해 건강 데이터에 접근합니다.",
         "NSHealthUpdateUsageDescription": "운동 기록을 저장하기 위해 건강 데이터를 업데이트합니다.",
         "NSLocationWhenInUseUsageDescription": "현재 위치의 날씨와 미세먼지 정보를 제공합니다.",

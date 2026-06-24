@@ -253,7 +253,7 @@ export default function OnboardingScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={styles.headerBlock}>
-            <Text style={styles.brandName}>핏로그</Text>
+            <Text style={styles.brandName}>레디핏</Text>
             <Text style={styles.title}>{STEP_TITLES[step]}</Text>
             <View style={styles.progressRow}>
               {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
